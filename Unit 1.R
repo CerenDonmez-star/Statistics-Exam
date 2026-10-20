@@ -244,5 +244,3 @@ fisher_g2 <- function(x){
 
 
 
-
-
