@@ -170,7 +170,7 @@ variance <- function(x){
 ###############################################
 
 standard_dev_f <- function(x, f){
-  m <- my_mean(x, f)
+  m <- my_mean_f(x, f)
   s <- sum((x-m)^2 * f) / sum(f)
   return(sqrt(s))
 }
@@ -311,11 +311,6 @@ iqr_outliers <- function(x) {
     extreme  = x[x < q1 - 3*iqr   | x > q3 + 3*iqr]
   )
 }
-
-
-
-
-
 
 
 

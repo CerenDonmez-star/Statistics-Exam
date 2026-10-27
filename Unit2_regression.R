@@ -1,10 +1,14 @@
 # ============================================================
 # Unit 2 - Statistical Modelling: from "Coefficient of Determination" on
 # All variances / covariances use the population formula (divide by n),
-# as in the slides (s_n^2, m11, m20, m02).
 # Every function accepts optional frequencies f (default: all 1).
 # ============================================================
 
+
+# ===============================================================
+# variables and explanations
+# correlation: a measure of the degree of dependence between variables
+# Regression aims to find an approximate model of the dependence between variables
 
 # ---------- Basic building blocks ----------
 
@@ -40,6 +44,7 @@ sse <- function(y, yest, f = rep(1, length(y))) {
 mse <- function(y, yest, f = rep(1, length(y))) {
   sse(y, yest, f) / sum(f)
 }
+
 
 # Coefficient of determination: R^2 = 1 - MSE / s_n^2(Y).
 # Can be negative if the model fits worse than the horizontal line y = mean(y).
@@ -231,7 +236,35 @@ fit_parabola <- function(x, y) {
   fit_basis(x, y, list(function(x) rep(1, length(x)), function(x) x, function(x) x^2))
 }
 
+# ex from the slides
 
+# z = a + bx + cy
+x <- c(0, 1, 0, -1, 0, 1, 1, 2)
+y <- c(0, 1, 1,  1, 3, 2, 2, 0)
+z <- c(2, 3, 4,  5, 7, 4, 5, 0)
+
+
+M <- design_matrix(x, y)
+M
+
+A <- multi_fit(M,z)
+A # a, b, c
+
+zest <- multi_predict(M,A)
+trunc(zest * 10000) / 10000 # predicted values for z
+
+sse <- function(z, zest, f = rep(1, length(z))){
+  sum((z-zest)^2)
+}
+sse(z, zest)
+
+resz <- z- zest
+
+var_n(resz)
+
+multi_mse(M,z, A)
+
+r_squared(z, zest)
 # ---------- Variable transformations (linearisation) ----------
 # In all of them the line is fitted in the transformed variables and the
 # MSE and R^2 are computed with the ORIGINAL y and the fitted y (as in the slides).

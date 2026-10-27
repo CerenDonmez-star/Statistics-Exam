@@ -30,59 +30,213 @@
 #  * k even: not centred, so correct it by weighting the two extremes
 #            with 0.5:  c(.5, 1, ..., 1, .5)/k  (same as a 2nd MA of order 2).
 #  The first/last floor(k/2) values are lost -> NA.
-moving_average <- function(x, k) {
-  w <- if (k %% 2 == 1) rep(1, k) / k else c(0.5, rep(1, k - 1), 0.5) / k
-  stats::filter(x, w)            # sides = 2 (centred) is the default
-}
 
-# Same thing written "by hand" (no stats::filter) - useful to check the formula.
-# Even k:  (0.5*X_{t-k/2} + X_{t-k/2+1} + ... + X_{t+k/2-1} + 0.5*X_{t+k/2}) / k
-moving_average_manual <- function(x, k) {
-  n <- length(x); out <- rep(NA_real_, n)
-  h <- k %/% 2
-  for (t in (h + 1):(n - h)) {
-    if (k %% 2 == 1) {
-      out[t] <- sum(x[(t - h):(t + h)]) / k
-    } else {
-      out[t] <- (0.5 * x[t - h] + sum(x[(t - h + 1):(t + h - 1)]) + 0.5 * x[t + h]) / k
-    }
-  }
-  out
-}
+# p lot ( uk )
+# lines ( desestM , col =4)
 
-# Even-order MA done in two steps (uncentred MA of order k, then MA of order 2).
-moving_average_two_step <- function(x, k) {
-  n  <- length(x)
-  m1 <- sapply(1:(n - k + 1), function(i) mean(x[i:(i + k - 1)]))  # uncentred
-  m2 <- (m1[-length(m1)] + m1[-1]) / 2                             # order 2
-  c(rep(NA, k / 2), m2, rep(NA, k / 2))
-}
+# best way is to use stats::filter(x, c(...))
+xx <- c (2.6767 , 3.2050 , 4.8714 , 4.6275 , 5.9008 ,
+         5.5200 , 5.1186 , 4.9507 , 4.6612 , 6.2572)
 
-# ---- >>> SLIDE CODING TASK (p.~14-15): moving averages of order 3 and 4 <<<
-xx <- c(2.6767, 3.2050, 4.8714, 4.6275, 5.9008,
-        5.5200, 5.1186, 4.9507, 4.6612, 6.2572)
+stats::filter(xx, c(1,1,1) / 3) # moving average of order 3
+stats:: filter(xx, c(0.5, 1, 1, 1, 0.5)/4) # moving average of order 4 centered
 
-# odd number no need to correction
-stats::filter(xx, c(1, 1, 1) / 3)                 # order 3 (slide code)
-# ==> NA 3.584367 4.234633 5.133233 5.349433 5.513133 5.196433 4.910167 5.289700 NA
-
-# even number requires correction
-stats::filter(xx, c(0.5, 1, 1, 1, 0.5) / 4)       # order 4 (slide code)
-# ==> NA NA 4.248163 4.940550 5.260825 5.332125 5.217575 5.154775 NA NA
-moving_average(xx, 3)                              # same, through my function
-moving_average(xx, 4)
-moving_average_manual(xx, 4)                       # same again, by hand
-moving_average_two_step(xx, 4)
-
-# ---- Exercise (1959-1965): trend with MA of order 3 and 4
+# slide 18
 x59 <- c(6, 6.2, 5.1, 4.9, 5.2, 5.8, 7)
 names(x59) <- 1959:1965
-moving_average(x59, 3)   # ==> NA 5.7667 5.4000 5.0667 5.3000 6.0000 NA
-moving_average(x59, 4)   # ==> NA NA 5.45 5.30 5.49 NA NA
-# by hand for 1961:  (0.5*6 + 6.2 + 5.1 + 4.9 + 0.5*5.2)/4 = 5.45
+
+# If we know the period of seasonal factors, it is advisable to use
+# that value as the order for the moving averages, e.g. for monthly
+# data use k = 12, for quarterly data k = 4 (four measurements in a year), etc.
+
+# take moving average of k where k is the period for the data (mothly weekly etc.)
+
+xx <- c (178.2 , 153.2 , 185.9 , 163.6 ,
+         196.3 , 156.9 , 197.9 , 166.4 ,
+         197.3 , 159.7 , 202.6 , 175.6 ,
+         209.5 , 169.5 , 202.4 , 179.8 ,
+         200.0 , 168.6 , 216.1 , 178.5
+)
+# indicating the frequency
+uk <- ts ( xx , start = c (1980 , 1) , frequency = 4)
+uk # X
+
+# trend component, using moving average of order 4
+tend <- stats::filter(uk, c(0.5, 1, 1, 1, 0.5)/ 4)
+tend # estimates trend-cycle T*C
+
+# eliminating Trend-cycle divide x by Tren-component
+# only remains E * A
+# MULTİPLİCATİVE CASE
+# if additive subtract it x = T + E + C + A
+
+est_ea <- uk / tend # E*A
+trunc(est_ea* 10000) / 10000 # gives E * A (the other factors are eliminated)
 
 
 # =====================================================================
+# SEASONAL VARIATION INDEX (E)
+# =====================================================================
+# 1. unnormalized seasonal component
+seasonal_component_unnormalized <- colMeans(matrix(est_ea, ncol = 4, byrow = T), na.rm = T)
+seasonal_component_unnormalized
+
+# 2. normalized seasonal component (corrected or adjusted)
+# the average of seasonal averages should be equal to 1 or 100 in percentage
+# in order to correct it: multiply 1 / current average or their sum / current sum
+
+normalized_seasonal_component <- seasonal_component_unnormalized / mean(seasonal_component_unnormalized)
+normalized_seasonal_component
+
+# =====================================================================
+# Random Component (A)
+# =====================================================================
+# E*A / E (normalized seasonal component)
+
+random_component <- est_ea / normalized_seasonal_component
+random_component
+
+
+# =====================================================================
+# Deseasonalisation
+# =====================================================================
+# X / E (after calculating seasonal component (E))
+# removing seasonal component
+# remain is called true or corrected trend
+# try to fit a regression line on X/E
+
+deseas <- uk / normalized_seasonal_component
+trunc(deseas * 10000) / 10000
+
+
+# =====================================================================
+# Regression Line (linear trend of deseasonalized series)
+# =====================================================================
+# Solution
+# To find the equation of the regression line in the form:
+# Y= a + b·t, where:
+# Y is the deseasonalized value of the series in a specific period.
+# t is the assigned time number (1, 2, . . . , 20).
+# a is the intercept of the trend.
+# b is the slope that shows the change per time period.
+xx <- seq_along(uk) # puts a vector 1: n where n is the length of time series vector
+model <- lm(deseas ~ xx )
+model
+a <- coef(model)[["(Intercept)"]]   # the constant
+b <- coef(model)[["xx"]]  
+
+regL <- ts( predict.lm ( model ) , start = c (1969 , 1) ,
+             frequency =4)
+regL # holds the predicted values of the regression line
+
+plot ( deseas )
+lines ( regL , col =2)
+
+
+
+# ==================== ex slide 56 ====================
+
+ex56 <- c(33742, 35401, 36147, 38067, 34149, 36176, 37485,
+       39047, 34783, 37042, 38008, 40132, 36466, 38680, 39976, 42273,
+       39131, 40780, 41852, 43684, 38729, 40427, 41576, 43886, 39131,
+       40394, 40956, 42959, 38714, 40062, 41152, 43460, 38695, 39780,
+       40923, 44093, 40777, 41778, 43160, 45897, 41947, 44061, 44378,
+       47237, 43315, 43396, 44843, 46835, 42833, 43548, 44637, 47107,
+       42552, 43526, 45039, 47940, 43740, 45007, 46667, 49325, 44878,
+       46234, 47055, 50318, 46354, 47260, 48883, 52605, 48527, 50237,
+       51592, 55152, 50451, 52294, 54633, 58802, 53990, 55477, 57850,
+       61978)
+
+uk56 <- ts (ex56 , start = c(1969 , 1) , frequency = 4)
+uk56
+
+tend56 <- stats::filter(uk56, c(0.5, 1,1,1,0.5) / 4)
+tend56 # trend cycle
+
+ea56 <- uk56 / tend56
+ea56 # E*A 
+
+seasonal_component_unnormalized56 <- colMeans(matrix(ea56, ncol = 4, byrow = T), na.rm = T)
+seasonal_component_unnormalized56
+
+normalized_seasonal_component56 <- seasonal_component_unnormalized56 / mean(seasonal_component_unnormalized56)
+normalized_seasonal_component56 # E (corrected)
+
+deseasonalized_trend <- ex56 / normalized_seasonal_component56
+deseasonalized_trend
+
+random_component56 <- ea56 / normalized_seasonal_component56
+random_component56
+
+xx56 <- seq_along(uk56) # puts a vector 1: n where n is the length of time series vector
+model <- lm(deseasonalized_trend ~ xx56 )
+model
+
+# the trend line: a + bt
+a <- coef(model)[["(Intercept)"]]   # the constant
+b <- coef(model)[["xx56"]]  
+
+regL <- ts( predict.lm( model ) , start = c (1969 ,1),
+            frequency =4)
+regL # holds the predicted values of the regression line
+
+
+# ======================= Prediction =======================
+
+# Autocorrelation
+
+data <- c (1.2 , 1.4 , 2.0 , 1.23 , 1.37 , 2.07 ,
+           1.25 , 1.47 , 2.09)
+# Function that calculates autocorrelation for a frequency n
+
+autoCorrel <- function ( data , n ) {
+  # Remove the last n data points
+  xx1 <- head ( data , -n )
+  # Remove the first n data points
+  xx2 <- tail ( data , -n )
+
+  sqrt( summary(lm( xx1 ~ xx2 )) $ r.squared )
+}
+
+autoCorrel(data, 3) # autocorrelation of data with freq 3
+# sliding the data by 3 cycles
+
+
+# ============== Index Numbers ================
+# elementary or simple index number the percentage
+# of variation (as a percentage or per unit) of the studied variable
+# with respect to the value obtained for the base reference period
+# X_a/b
+
+
+# ex: If in 1970 a statistical variable X is 123 and in 1980 it is 148,
+# calculate the percentage of variation with 1970 as the base period
+
+# X_1980/1970: 148 / 123 (value at time a / value at time b)
+
+# =====================================================================
+# 5. PREDICTION  (trend extrapolated x seasonal index)
+# =====================================================================
+
+# Season (1..p) of period number t:  ((t-1) mod p) + 1
+season_of <- function(t, period) ((t - 1) %% period) + 1
+
+# Forecast for period t:
+#   multiplicative:  X^_t = (a + b*t) * E_season(t)
+#   additive:        X^_t = (a + b*t) + E_season(t)
+# coef: a and b values of regressin line, i_idx: corrected seasonal indices, t: period of forecast
+forecast_ts <- function(coef, e_idx, t, model = c("multiplicative", "additive")) {
+  model <- match.arg(model)
+  tr <- unname(coef["a"] + coef["b"] * t)
+  e  <- e_idx[season_of(t, length(e_idx))]
+  if (model == "multiplicative") tr * e else tr + e
+}
+
+forecast_ts(c(a = a,b  = b), normalized_seasonal_component56, 81:85)
+
+
+
+
 # 2. DECOMPOSITION  X = T*E*C*A   (multiplicative)  /  X = T+E+C+A (additive)
 # =====================================================================
 
